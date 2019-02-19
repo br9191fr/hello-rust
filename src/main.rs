@@ -17,7 +17,7 @@ use ring::rand;
 use reqwest::get;
 use reqwest::{Client, RequestBuilder, Method, Result, Response};
 use reqwest::header;
-use reqwest::header::{HeaderMap,HeaderValue};
+use reqwest::header::{HeaderMap, HeaderValue};
 
 use std::fs::File;
 use std::io::Read;
@@ -85,25 +85,6 @@ fn run1() {
     println!("Signature verify OK.")
 }
 
-fn run2() {
-    println!("Starting run2");
-    //let mut buf = Vec::new();
-    //let fopen = File::open("my-ident.pem");
-    //fopen.read_to_end(&mut buf).unwrap();
-    //let id = reqwest::Identity::from_pem(&buf).unwrap();
-    let mut response = reqwest::get("https://www.cecurity.com").expect("Failed to get response from URL");
-    println!("Status is {}", response.status());
-
-    for (k, v) in response.headers().iter() {
-        println!("{:?}: {:?}", k, v);
-
-        //println!("Read {:?}",header);
-    }
-
-    let mut buf = String::new();
-    response.read_to_string(&mut buf).expect("Failed to read response");
-    //println!("{}", buf);
-}
 
 fn display_status(r: Result<reqwest::Response>) -> String {
     let ans = match r {
@@ -126,93 +107,125 @@ fn run3(url: String) {
 }
 
 //#[cfg(feature = "default-tls")]
-fn run4(url: String,url2 :String) -> String {
+fn run4(url: String) -> String {
     println!("Starting run4 with <{}>", url);
+
+    // Step 1 : create client_builder
     let c_builder = Client::builder();
     let mut buf = Vec::new();
 
     let f = File::open("c:/dvlpt/rust/hello-rust/bruno_orange.p12");
-    if let Err(e_f) = f {
-        return e_f.to_string();
-    }
- //   let b = f.unwrap().read_to_end(&mut buf);
-    if let Err(e_b) = f.unwrap().read_to_end(&mut buf) {
-        return e_b.to_string();
-    }
+    if let Err(e_f) = f { return e_f.to_string(); }
+    if let Err(e_b) = f.unwrap().read_to_end(&mut buf) { return e_b.to_string(); }
 
+    // Step 2 : create identity
     let pkcs12 = reqwest::Identity::from_pkcs12_der(&buf, "br31415926;");
-    if let Err(e_p) = pkcs12 {
-        return e_p.to_string();
-    }
-    let good_pkcs12  = pkcs12.unwrap();
+    if let Err(e_p) = pkcs12 { return e_p.to_string(); }
+    let good_pkcs12 = pkcs12.unwrap();
+
+    // Step 3 : create client by adding identity to client_builder
     let clt = c_builder.identity(good_pkcs12).build();
-    if let Err(e_clt) = clt {
-        return e_clt.to_string();
-    }
+    if let Err(e_clt) = clt { return e_clt.to_string(); }
     let good_clt = clt.unwrap();
+
+    // Step 4 : attach request to client => req builder then config and build
     let req_res = good_clt.request(Method::GET, &url)
         .basic_auth("bruno", Some("xyzt"))
         .query(&[("lang", "rust")])
-        .header(header::COOKIE,"xyzt; path=/; HttpOnly")
+        .header(header::COOKIE, "xyzt; path=/; HttpOnly")
+        .header(header::ACCEPT_CHARSET,"UTF-8")
         .build();
 
-    if let Err(e2) = req_res {
-        //println!("Cannot execute request");
-        return e2.to_string();
-    }
+    if let Err(e2) = req_res { return e2.to_string(); }
+
+    // Step 5 : launch client execution and get result
     let final_result = good_clt.execute(req_res.unwrap());
-    if let Err(e_fr) = final_result {
-        //println!("Error while executing: {:?}",e3);
-        return e_fr.to_string();
-    }
+    if let Err(e_fr) = final_result { return e_fr.to_string(); }
     println!("========== Connect....");
-    let mut response = final_result.expect("Bad");
+
+    // Step 6 : get info from execution result
+    let mut response = final_result.expect("First request Execution Error");
     println!("=================> Execution returned : {}", response.status());
-    let mut cookies : Vec<String> = vec!();
+    let mut buf = String::new();
+
+    // Step 7 : get and print body
+    let read_status = response.read_to_string(&mut buf);
+    if let Err(r_r) = read_status { return r_r.to_string();}
+    //.expect("Failed to read response");
+    //println!("Response : {}",buf);
+
+    let mut cookies: Vec<String> = vec!();
+
+    // Step 8 : export cookies from headers into new header map
     let mut hdrs = HeaderMap::new();
     for (k, v) in response.headers().iter() {
         //println!("{:?}: {:?}", k, v);
         if k == header::SET_COOKIE {
             cookies.push(v.to_str().unwrap().to_string());
-            println!("Add cookie {:?} with value {:?}", k,v);
-            hdrs.insert(header::COOKIE,HeaderValue::from(v));
+            println!("Add cookie {:?} with value {:?}", k, v);
+            hdrs.insert(header::COOKIE, HeaderValue::from(v));
             //req_bldr.header(header::COOKIE,v);
         }
     }
+    println!("Cookies : length = {} => {:?}", cookies.len(), cookies);
+
+    // New request ( restart at step 4 without building)
     let req_bldr = good_clt.request(Method::GET, &url)
         .basic_auth("bruno", Some("xyzt"))
         .query(&[("lang", "rust")]);
 
+    // Step add new header map to req builder and build
     let req_b2 = req_bldr.headers(hdrs);
-    let mut buf = String::new();
-    response.read_to_string(&mut buf).expect("Failed to read response");
-//    println!("{}", buf);
-    println!("Cookies : length = {} => {:?}", cookies.len(), cookies);
     let req_res2 = req_b2.build();
+    if let Err(e_r2) = req_res2 { return e_r2.to_string(); }
 
-    if let Err(e_r2) = req_res2 {
-
-        return e_r2.to_string();
-    }
     println!("========== Connect....");
+
     let final_result2 = good_clt.execute(req_res2.unwrap());
-    if let Err(e_fr2) = final_result2 {
-        return e_fr2.to_string();
-    }
-    let mut response2 = final_result2.expect("Bad");
+    if let Err(e_fr2) = final_result2 { return e_fr2.to_string(); }
+    let response2 = final_result2.expect("Second request Execution Error");
     println!("=================> Execution returned : {}", response2.status());
     "OK".to_string()
 }
 
+// TODO AJouter les fonctions pour envois POST
+fn send_post_form_encoded() {
+/*
+pub fn form<T: Serialize + ?Sized>(self, form: &T) -> RequestBuilder
+
+Send a form body.
+
+Sets the body to the url encoded serialization of the passed value, and also sets the Content-Type: application/x-www-form-urlencoded header.
+
+let mut params = HashMap::new();
+params.insert("lang", "rust");
+
+let client = reqwest::Client::new();
+let res = client.post("http://httpbin.org")
+    .form(&params)
+    .send()?;
+*/
+}
+fn send_post_multipart() {
+/*
+pub fn multipart(self, multipart: Form) -> RequestBuilder
+
+Sends a multipart/form-data body.
+
+let client = reqwest::Client::new();
+let form = reqwest::multipart::Form::new()
+    .text("key3", "value3")
+    .file("file", "/path/to/field")?;
+
+let response = client.post("your url")
+    .multipart(form)
+    .send()?;
+*/
+}
 
 fn main() {
     let good_url = "https://www.cecurity.com".to_string();
-    let bad_url = "https://www.cecurity.com/xyzt".to_string();
 
-    let _s = run4(good_url.clone(),good_url.clone());
-    println!("run4 return {}",_s);
-//    let _t = run4(bad_url.clone(),bad_url.clone());
-//    println!("run4 return {}",_t);
-//    let _t = run4("".to_string(),bad_url.clone());
-//    println!("run4 return {}",_t);
+    let _s = run4(good_url.clone());
+    println!("run4 return {}", _s);
 }
