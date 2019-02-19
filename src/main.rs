@@ -16,6 +16,7 @@ use ring::rand;
 
 use reqwest::get;
 use reqwest::{Client, RequestBuilder, Method, Result, Response};
+use reqwest::header;
 
 use std::fs::File;
 use std::io::Read;
@@ -124,9 +125,9 @@ fn run3(url: String) {
 }
 
 //#[cfg(feature = "default-tls")]
-fn run4(url: String) -> String {
+fn run4(url: String,url2 :String) -> String {
     println!("Starting run4 with <{}>", url);
-    let client = Client::new();
+    let c_builder = Client::builder();
     let mut buf = Vec::new();
 
     let f = File::open("c:/dvlpt/rust/hello-rust/bruno_orange.p12");
@@ -140,32 +141,55 @@ fn run4(url: String) -> String {
         return e1.to_string();
     }
 
-    let _pkcs12 = reqwest::Identity::from_pkcs12_der(&buf, "br31415926;;");
-    let req_res = client.request(Method::GET, &url)
+    let pkcs12 = reqwest::Identity::from_pkcs12_der(&buf, "br31415926;");
+    if let Err(e0) = pkcs12 {
+        //println!("Cannot execute request");
+        return e0.to_string();
+    }
+    let good_pkcs12  = pkcs12.unwrap();
+    let clt = c_builder.identity(good_pkcs12).build();
+    if let Err(e0) = clt {
+        //println!("Cannot execute request");
+        return e0.to_string();
+    }
+//    let clt2 = c_builder.identity(good_pkcs12).build();
+    let good_clt = clt.unwrap();
+    let req_res = good_clt.request(Method::GET, &url)
         .basic_auth("bruno", Some("xyzt"))
         .query(&[("lang", "rust")])
         .build();
+    let _req_res2 = good_clt.request(Method::GET, &url2)
+        .basic_auth("bruno", Some("xyzt"))
+        .query(&[("lang", "rust")])
+        .header(header::COOKIE,"xyzt; path=/; HttpOnly")
+        .build();
+
     if let Err(e2) = req_res {
         //println!("Cannot execute request");
         return e2.to_string();
     }
-    let final_result = client.execute(req_res.unwrap());
+    let final_result = good_clt.execute(req_res.unwrap());
     if let Err(e3) = final_result {
         //println!("Error while executing: {:?}",e3);
         return e3.to_string();
     }
     let mut response = final_result.expect("Bad");
-    println!("Execute returned : {}", response.status());
+    println!("=================> Execution returned : {}", response.status());
+    let mut cookies : Vec<String> = vec!();
     for (k, v) in response.headers().iter() {
-        println!("{:?}: {:?}", k, v);
+        //println!("{:?}: {:?}", k, v);
+        if k == header::SET_COOKIE {
+            cookies.push(v.to_str().unwrap().to_string());
+            println!("Add cookie {:?} with value {:?}", k,v);
+        }
     }
-
     let mut buf = String::new();
     response.read_to_string(&mut buf).expect("Failed to read response");
-    //println!("{}", buf);
-
+//    println!("{}", buf);
+    println!("Cookies : length = {} => {:?}", cookies.len(), cookies);
     "OK".to_string()
 }
+
 
 fn main() {
     let good_url = "https://www.cecurity.com".to_string();
@@ -175,10 +199,10 @@ fn main() {
     // run2();
     //run3(good_url.clone());
     //run3(bad_url.clone());
-    let _s = run4(good_url.clone());
+    let _s = run4(good_url.clone(),bad_url.clone());
     println!("run4 return {}",_s);
-    let _t = run4(bad_url.clone());
+    let _t = run4(bad_url.clone(),bad_url.clone());
     println!("run4 return {}",_t);
-    let _t = run4("".to_string());
+    let _t = run4("".to_string(),bad_url.clone());
     println!("run4 return {}",_t);
 }
