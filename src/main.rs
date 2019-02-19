@@ -17,6 +17,7 @@ use ring::rand;
 use reqwest::get;
 use reqwest::{Client, RequestBuilder, Method, Result, Response};
 use reqwest::header;
+use reqwest::header::{HeaderMap,HeaderValue};
 
 use std::fs::File;
 use std::io::Read;
@@ -131,34 +132,25 @@ fn run4(url: String,url2 :String) -> String {
     let mut buf = Vec::new();
 
     let f = File::open("c:/dvlpt/rust/hello-rust/bruno_orange.p12");
-    if let Err(_) = f {
-        //println!("Unable to open p12");
-        return "Cannot open p12".to_string();
+    if let Err(e_f) = f {
+        return e_f.to_string();
     }
-    let b = f.unwrap().read_to_end(&mut buf);
-    if let Err(e1) = b {
-        //println!("Unable to read p12");
-        return e1.to_string();
+ //   let b = f.unwrap().read_to_end(&mut buf);
+    if let Err(e_b) = f.unwrap().read_to_end(&mut buf) {
+        return e_b.to_string();
     }
 
     let pkcs12 = reqwest::Identity::from_pkcs12_der(&buf, "br31415926;");
-    if let Err(e0) = pkcs12 {
-        //println!("Cannot execute request");
-        return e0.to_string();
+    if let Err(e_p) = pkcs12 {
+        return e_p.to_string();
     }
     let good_pkcs12  = pkcs12.unwrap();
     let clt = c_builder.identity(good_pkcs12).build();
-    if let Err(e0) = clt {
-        //println!("Cannot execute request");
-        return e0.to_string();
+    if let Err(e_clt) = clt {
+        return e_clt.to_string();
     }
-//    let clt2 = c_builder.identity(good_pkcs12).build();
     let good_clt = clt.unwrap();
     let req_res = good_clt.request(Method::GET, &url)
-        .basic_auth("bruno", Some("xyzt"))
-        .query(&[("lang", "rust")])
-        .build();
-    let _req_res2 = good_clt.request(Method::GET, &url2)
         .basic_auth("bruno", Some("xyzt"))
         .query(&[("lang", "rust")])
         .header(header::COOKIE,"xyzt; path=/; HttpOnly")
@@ -169,40 +161,58 @@ fn run4(url: String,url2 :String) -> String {
         return e2.to_string();
     }
     let final_result = good_clt.execute(req_res.unwrap());
-    if let Err(e3) = final_result {
+    if let Err(e_fr) = final_result {
         //println!("Error while executing: {:?}",e3);
-        return e3.to_string();
+        return e_fr.to_string();
     }
+    println!("========== Connect....");
     let mut response = final_result.expect("Bad");
     println!("=================> Execution returned : {}", response.status());
     let mut cookies : Vec<String> = vec!();
+    let mut hdrs = HeaderMap::new();
     for (k, v) in response.headers().iter() {
         //println!("{:?}: {:?}", k, v);
         if k == header::SET_COOKIE {
             cookies.push(v.to_str().unwrap().to_string());
             println!("Add cookie {:?} with value {:?}", k,v);
+            hdrs.insert(header::COOKIE,HeaderValue::from(v));
+            //req_bldr.header(header::COOKIE,v);
         }
     }
+    let req_bldr = good_clt.request(Method::GET, &url)
+        .basic_auth("bruno", Some("xyzt"))
+        .query(&[("lang", "rust")]);
+
+    let req_b2 = req_bldr.headers(hdrs);
     let mut buf = String::new();
     response.read_to_string(&mut buf).expect("Failed to read response");
 //    println!("{}", buf);
     println!("Cookies : length = {} => {:?}", cookies.len(), cookies);
+    let req_res2 = req_b2.build();
+
+    if let Err(e_r2) = req_res2 {
+
+        return e_r2.to_string();
+    }
+    println!("========== Connect....");
+    let final_result2 = good_clt.execute(req_res2.unwrap());
+    if let Err(e_fr2) = final_result2 {
+        return e_fr2.to_string();
+    }
+    let mut response2 = final_result2.expect("Bad");
+    println!("=================> Execution returned : {}", response2.status());
     "OK".to_string()
 }
 
 
 fn main() {
     let good_url = "https://www.cecurity.com".to_string();
-//    let bad_url  = "https://xyz.cecurity.com".to_string();
     let bad_url = "https://www.cecurity.com/xyzt".to_string();
-    // run1();
-    // run2();
-    //run3(good_url.clone());
-    //run3(bad_url.clone());
-    let _s = run4(good_url.clone(),bad_url.clone());
+
+    let _s = run4(good_url.clone(),good_url.clone());
     println!("run4 return {}",_s);
-    let _t = run4(bad_url.clone(),bad_url.clone());
-    println!("run4 return {}",_t);
-    let _t = run4("".to_string(),bad_url.clone());
-    println!("run4 return {}",_t);
+//    let _t = run4(bad_url.clone(),bad_url.clone());
+//    println!("run4 return {}",_t);
+//    let _t = run4("".to_string(),bad_url.clone());
+//    println!("run4 return {}",_t);
 }
