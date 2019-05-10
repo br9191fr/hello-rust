@@ -13,6 +13,10 @@ use jwt::errors::ErrorKind;
 use jwt::{decode, encode, Header, Validation};
 use ring::signature;
 use ring::rand;
+//use ring::rand::SystemRandom;
+use ring::aead::*;
+use ring::pbkdf2::*;
+use ring::digest;
 
 use reqwest::get;
 use reqwest::{Client, RequestBuilder, Method, Result, Response};
@@ -21,6 +25,7 @@ use reqwest::header::{HeaderMap, HeaderValue};
 
 use std::fs::File;
 use std::io::Read;
+use ring::rand::SecureRandom;
 
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -36,7 +41,7 @@ fn run1() {
     println!("Starting run1");
     let my_claims =
         Claims { sub: "b@b.com".to_owned(), company: "ACME".to_owned(), exp: 10000000000 };
-    let key = "secret";
+    let key = "my_secret";
     let token = match encode(&Header::default(), &my_claims, key.as_ref()) {
         Ok(t) => t,
         Err(_) => panic!(), // in practice you would return the error
@@ -133,7 +138,7 @@ fn run4(url: String) -> String {
         .basic_auth("bruno", Some("xyzt"))
         .query(&[("lang", "rust")])
         .header(header::COOKIE, "xyzt; path=/; HttpOnly")
-        .header(header::ACCEPT_CHARSET,"UTF-8")
+        .header(header::ACCEPT_CHARSET, "UTF-8")
         .build();
 
     if let Err(e2) = req_res { return e2.to_string(); }
@@ -150,7 +155,7 @@ fn run4(url: String) -> String {
 
     // Step 7 : get and print body
     let read_status = response.read_to_string(&mut buf);
-    if let Err(r_r) = read_status { return r_r.to_string();}
+    if let Err(r_r) = read_status { return r_r.to_string(); }
     //.expect("Failed to read response");
     //println!("Response : {}",buf);
 
@@ -190,37 +195,95 @@ fn run4(url: String) -> String {
 
 // TODO AJouter les fonctions pour envois POST
 fn send_post_form_encoded() {
-/*
-pub fn form<T: Serialize + ?Sized>(self, form: &T) -> RequestBuilder
+    /*
+    pub fn form<T: Serialize + ?Sized>(self, form: &T) -> RequestBuilder
 
-Send a form body.
+    Send a form body.
 
-Sets the body to the url encoded serialization of the passed value, and also sets the Content-Type: application/x-www-form-urlencoded header.
+    Sets the body to the url encoded serialization of the passed value, and also sets the Content-Type: application/x-www-form-urlencoded header.
 
-let mut params = HashMap::new();
-params.insert("lang", "rust");
+    let mut params = HashMap::new();
+    params.insert("lang", "rust");
 
-let client = reqwest::Client::new();
-let res = client.post("http://httpbin.org")
-    .form(&params)
-    .send()?;
-*/
+    let client = reqwest::Client::new();
+    let res = client.post("http://httpbin.org")
+        .form(&params)
+        .send()?;
+    */
 }
+
 fn send_post_multipart() {
-/*
-pub fn multipart(self, multipart: Form) -> RequestBuilder
+    /*
+    pub fn multipart(self, multipart: Form) -> RequestBuilder
 
-Sends a multipart/form-data body.
+    Sends a multipart/form-data body.
 
-let client = reqwest::Client::new();
-let form = reqwest::multipart::Form::new()
-    .text("key3", "value3")
-    .file("file", "/path/to/field")?;
+    let client = reqwest::Client::new();
+    let form = reqwest::multipart::Form::new()
+        .text("key3", "value3")
+        .file("file", "/path/to/field")?;
 
-let response = client.post("your url")
-    .multipart(form)
-    .send()?;
-*/
+    let response = client.post("your url")
+        .multipart(form)
+        .send()?;
+    */
+}
+
+fn run5() {
+    println!("Starting run5");
+// The password will be used to generate a key
+    let password = b"This is a very nice password";
+
+// Usually the salt has some random data and something that relates to the user
+// like an username
+    let salt = [0, 1, 2, 3, 4, 5, 6, 7];
+
+// Keys are sent as &[T] and must have 32 bytes
+    let mut key = [0; 32];
+    derive(&digest::SHA256, 100, &salt, &password[..], &mut key);
+
+// Your private data
+    let content = b"my content is here to be encrypted and tested".to_vec();
+    //println!("Input data : {:?}", content.to_);
+
+    println!("Content to encrypt's size {}", content.len());
+
+// Additional data that you would like to send and it would not be encrypted but it would
+// be signed
+    let additional_data: [u8; 0] = [];
+
+// Ring uses the same input variable as output
+    let mut in_out = content.clone();
+
+// The input/output variable need some space for a suffix
+    println!("Tag len {}", CHACHA20_POLY1305.tag_len());
+    for _ in 0..CHACHA20_POLY1305.tag_len() {
+        in_out.push(0);
+    }
+
+// Opening key used to decrypt data
+    let opening_key = OpeningKey::new(&CHACHA20_POLY1305, &key).unwrap();
+
+// Sealing key used to encrypt data
+    let sealing_key = SealingKey::new(&CHACHA20_POLY1305, &key).unwrap();
+
+// Random data must be used only once per encryption
+    let mut nonce = vec![0; 12];
+
+// Fill nonce with random data
+    let rnd = rand::SystemRandom::new();
+    rnd.fill(&mut nonce).unwrap();
+// Encrypt data into in_out variable
+    let output_size = seal_in_place(&sealing_key, &nonce, &additional_data, &mut in_out,
+                                    CHACHA20_POLY1305.tag_len()).unwrap();
+
+    println!("Encrypted data's size {}", output_size);
+
+    let decrypted_data = open_in_place(&opening_key, &nonce, &additional_data,
+                                       0, &mut in_out).unwrap();
+
+    println!("Decrypted data : {:?}", String::from_utf8(decrypted_data.to_vec()).unwrap());
+    assert_eq!(content, decrypted_data);
 }
 
 fn main() {
@@ -228,4 +291,6 @@ fn main() {
 
     let _s = run4(good_url.clone());
     println!("run4 return {}", _s);
+    run1();
+    run5();
 }
