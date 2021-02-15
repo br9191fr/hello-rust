@@ -26,6 +26,7 @@ use reqwest::header::{HeaderMap, HeaderValue};
 use std::fs::File;
 use std::io::Read;
 use ring::rand::SecureRandom;
+use ring::signature::KeyPair;
 
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -40,6 +41,7 @@ struct Claims {
 // check https://jwt.io
 fn run1() {
     println!("Starting run1");
+    /*
     let my_claims =
         Claims { sub: "b@b.com".to_owned(), company: "ACME".to_owned(), exp: 10000000000, other: "MyData".to_owned() };
     let key = "my_secret";
@@ -59,7 +61,10 @@ fn run1() {
     };
     println!("{:?}", token_data.claims);
     println!("{:?}", token_data.header);
+
+    */
     println!("Signature test");
+    // TODO Update code to be conformant with current crates
     // Generate a key pair in PKCS#8 (v2) format.
     let rng = rand::SystemRandom::new();
     //let rng1 =
@@ -68,8 +73,8 @@ fn run1() {
 // Normally the application would store the PKCS#8 file persistently. Later
 // it would read the PKCS#8 file from persistent storage to use it.
 
-    let key_pair = signature::Ed25519KeyPair::from_pkcs8(untrusted::Input::from(&pkcs8_bytes)).expect("Error in key pair generation step 2");
-
+    //let key_pair = signature::Ed25519KeyPair::from_pkcs8(untrusted::Input::from(&pkcs8_bytes)).expect("Error in key pair generation step 2");
+    let key_pair = signature::Ed25519KeyPair::from_pkcs8(pkcs8_bytes.as_ref()).expect("Error in key pair generation step 2");
     // Sign the message "hello, world".
     const MESSAGE: &[u8] = b"hello, world";
     let sig = key_pair.sign(MESSAGE);
@@ -77,17 +82,14 @@ fn run1() {
 // Normally an application would extract the bytes of the signature and
 // send them in a protocol message to the peer(s). Here we just get the
 // public key key directly from the key pair.
-    let peer_public_key_bytes = key_pair.public_key_bytes();
-    let sig_bytes = sig.as_ref();
+    let peer_public_key_bytes = key_pair.public_key().as_ref();
 
 // Verify the signature of the message using the public key. Normally the
 // verifier of the message would parse the inputs to `signature::verify`
 // out of the protocol message(s) sent by the signer.
-    let peer_public_key = untrusted::Input::from(peer_public_key_bytes);
-    let msg = untrusted::Input::from(MESSAGE);
-    let sig = untrusted::Input::from(sig_bytes);
-
-    signature::verify(&signature::ED25519, peer_public_key, msg, sig).expect("Error while verify signature");
+    let peer_public_key =
+        signature::UnparsedPublicKey::new(&signature::ED25519, peer_public_key_bytes);
+    peer_public_key.verify(MESSAGE, sig.as_ref()).expect("Error while verifying signature");
     println!("Signature verify OK.")
 }
 
@@ -99,7 +101,7 @@ fn display_status(r: Result<reqwest::Response>) -> String {
     };
     return ans.to_string();
 }
-
+/*
 fn run3(url: String) {
     println!("Starting run3 with {}", url);
     let client = Client::new();
@@ -193,7 +195,7 @@ fn run4(url: String) -> String {
     println!("=================> Execution returned : {}", response2.status());
     "OK".to_string()
 }
-
+*/
 // TODO AJouter les fonctions pour envois POST
 fn send_post_form_encoded() {
     /*
@@ -229,7 +231,7 @@ fn send_post_multipart() {
         .send()?;
     */
 }
-
+/*
 fn run5() {
     println!("Starting run5");
 // The password will be used to generate a key
@@ -286,12 +288,12 @@ fn run5() {
     println!("Decrypted data : {:?}", String::from_utf8(decrypted_data.to_vec()).unwrap());
     assert_eq!(content, decrypted_data);
 }
-
+*/
 fn main() {
-    let good_url = "https://www.cecurity.com".to_string();
+    //let good_url = "https://www.cecurity.com".to_string();
 
-    let _s = run4(good_url.clone());
-    println!("run4 return {}", _s);
+    //let _s = run4(good_url.clone());
+    //println!("run4 return {}", _s);
     run1();
-    run5();
+    //run5();
 }
