@@ -33,6 +33,7 @@ struct Claims {
     sub: String,
     company: String,
     exp: usize,
+    other: String
 }
 
 
@@ -40,7 +41,7 @@ struct Claims {
 fn run1() {
     println!("Starting run1");
     let my_claims =
-        Claims { sub: "b@b.com".to_owned(), company: "ACME".to_owned(), exp: 10000000000 };
+        Claims { sub: "b@b.com".to_owned(), company: "ACME".to_owned(), exp: 10000000000, other: "MyData".to_owned() };
     let key = "my_secret";
     let token = match encode(&Header::default(), &my_claims, key.as_ref()) {
         Ok(t) => t,
