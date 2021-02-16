@@ -26,4 +26,5 @@ rand = "0.8.3"
 reqwest = "0.11.0"
 hex-literal = "0.2.0"
 #tokio = "0.1.22"
-tokio = "1.2.0"
+tokio = { version = "1" , feature = ["full"]}
+futures = "0.3.12"

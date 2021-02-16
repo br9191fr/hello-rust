@@ -6,9 +6,14 @@ use ring::signature;
 use ring::rand;
 use ring::aead::*;
 use ring::pbkdf2::*;
+use ring::pbkdf2;
 use ring::digest;
 use ring::rand::SecureRandom;
 use hex_literal::hex;
+
+static PBKDF2_ALG: pbkdf2::Algorithm = pbkdf2::PBKDF2_HMAC_SHA256;
+const CREDENTIAL_LEN: usize = digest::SHA256_OUTPUT_LEN;
+
 fn enc_dec() {
     println!("Starting enc_dec");
 // The password will be used to generate a key
@@ -19,8 +24,9 @@ fn enc_dec() {
     let salt = [0, 1, 2, 3, 4, 5, 6, 7, 8];
 
 // Keys are sent as &[T] and must have 32 bytes
-    let mut key = [0; 32];
-    derive(&digest::SHA256, 100, &salt, &password[..], &mut key);
+    let mut key = [0u8; CREDENTIAL_LEN];
+    let iter : std::num::NonZeroU32 = std::num::NonZeroU32::new(1000).unwrap();
+    derive(PBKDF2_ALG, iter, &salt, &password[..], &mut key);
 
 // Your private data
     let src ="This is a message to encrypt";
@@ -50,7 +56,7 @@ fn enc_dec() {
     for _ in 0..CHACHA20_POLY1305.tag_len() {
         in_out.push(0);
     }
-
+// TODO Corriger avec https://docs.rs/ring/0.16.20
 // Opening key used to decrypt data
     let opening_key = OpeningKey::new(&CHACHA20_POLY1305, &key).unwrap();
 
@@ -64,12 +70,12 @@ fn enc_dec() {
     let rnd = rand::SystemRandom::new();
     rnd.fill(&mut nonce).unwrap();
 // Encrypt data into in_out variable
-    let output_size = seal_in_place(&sealing_key, &nonce, &additional_data, &mut in_out,
+    let output_size = OpeningKey::seal_in_place_append_tag(&sealing_key, &nonce, &additional_data, &mut in_out,
                                     CHACHA20_POLY1305.tag_len()).unwrap();
 
     println!("Encrypted data's size {}", output_size);
 
-    let decrypted_data = open_in_place(&opening_key, &nonce, &ad_data,
+    let decrypted_data = OpeningKey::open_in_place(&opening_key, &nonce, &ad_data,
                                        0, &mut in_out).unwrap();
 
     println!("Decrypted data : {:?}", String::from_utf8(decrypted_data.to_vec()).unwrap());

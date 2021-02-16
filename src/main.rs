@@ -11,6 +11,7 @@ extern crate reqwest;
 
 use jwt::errors::ErrorKind;
 use jwt::{decode, encode, Header, Validation};
+use futures::executor::block_on;
 use ring::signature;
 use ring::rand;
 //use ring::rand::SystemRandom;
@@ -27,6 +28,7 @@ use std::fs::File;
 use std::io::Read;
 use ring::rand::SecureRandom;
 use ring::signature::KeyPair;
+use std::borrow::Borrow;
 
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -37,10 +39,8 @@ struct Claims {
     other: String
 }
 
-
-// check https://jwt.io
-fn run1() {
-    println!("Starting run1");
+fn check_claims() {
+    println!("starting check_claims");
     /*
     let my_claims =
         Claims { sub: "b@b.com".to_owned(), company: "ACME".to_owned(), exp: 10000000000, other: "MyData".to_owned() };
@@ -63,7 +63,11 @@ fn run1() {
     println!("{:?}", token_data.header);
 
     */
-    println!("Signature test");
+
+}
+// check https://jwt.io
+fn run1() {
+    println!("Starting run1");
     // TODO Update code to be conformant with current crates
     // Generate a key pair in PKCS#8 (v2) format.
     let rng = rand::SystemRandom::new();
@@ -101,8 +105,8 @@ fn display_status(r: Result<reqwest::Response>) -> String {
     };
     return ans.to_string();
 }
-/*
-fn run3(url: String) {
+
+async fn run3(url: String) {
     println!("Starting run3 with {}", url);
     let client = Client::new();
     let req_builder1 = client.request(Method::GET, &url)
@@ -110,10 +114,10 @@ fn run3(url: String) {
         .query(&[("lang", "rust")]);
 //    let res = reqBuilder.build().expect("Error while building request");
 
-    let r = req_builder1.send();
+    let r = req_builder1.send().await;
     println!("Execute returned : {}", display_status(r));
 }
-
+/*
 //#[cfg(feature = "default-tls")]
 fn run4(url: String) -> String {
     println!("Starting run4 with <{}>", url);
@@ -289,11 +293,14 @@ fn run5() {
     assert_eq!(content, decrypted_data);
 }
 */
-fn main() {
-    //let good_url = "https://www.cecurity.com".to_string();
+#[tokio::main]
+async fn main() {
+    let good_url = "https://www.cecurity.com".to_string();
 
     //let _s = run4(good_url.clone());
     //println!("run4 return {}", _s);
     run1();
+    let o = run3(good_url);
+    block_on(o);
     //run5();
 }
