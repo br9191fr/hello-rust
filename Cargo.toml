@@ -16,8 +16,12 @@ path = "src/bin/tokio1.rs"
 name = "all"
 path = "src/main.rs"
 
+[[bin]]
+name = "jwt"
+path = "src/bin/jwt.rs"
+
 [dependencies]
-jsonwebtoken = "7.2.0"
+jsonwebtoken = "8.1.0"
 serde_derive = "1.0.123"
 serde = "1.0.123"
 ring = "0.16.20"
